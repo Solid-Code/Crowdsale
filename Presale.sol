@@ -1,6 +1,6 @@
-pragma solidity ^0.4.16;
+pragma solidity ^0.4.18;
 
-library SafeMath {// Partial SafeMath Library
+library SafeMath {
 
     function sub(uint256 a, uint256 b) internal pure returns (uint256 c) {
         require((c = a - b) <= a);
@@ -9,7 +9,7 @@ library SafeMath {// Partial SafeMath Library
         require((c = a + b) >= a);
     }
     function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a * b) >= a);
+        require((c == 0 || (c = a * b) / b == a));
     }
     function div(uint256 a, uint256 b) internal pure returns (uint256 c) {
         c = a / b;
@@ -28,42 +28,37 @@ contract presale {
     Token public tokenContract;
 
     address public beneficiaryAddress;
+    uint256 public minimumContribution;
     uint256 public startTime;
     uint256 public endTime;
-    uint256 public heldPercent;
     uint256 public tokensPerEther;
-    bool softCapMet;
-    bool hardCapMet;
+
     mapping (address => uint256) public contributionBy;
     
     event ContributionReceived(address contributer, uint256 amount, uint256 totalContributions,uint totalAmountRaised);
     event FundsWithdrawn(uint256 funds, address beneficiaryAddress);
-    event PaidRefund(address recipient, uint256 amount);
 
-    /**
-     * Constructor function
-     *
-     * Setup the owner
-     */
     function Presale(
         address _beneficiaryAddress,
         uint256 _tokensPerEther,
+        uint256 _minimumContributionInFinney,
         uint256 _startTimeInHoursFromNow,
         uint256 _saleLengthinHours,
-        address _tokenContractAddress
-    ) {
-        startTime = now + _startTimeInHoursFromNow * 1 hours;
-        endTime = startTime + _saleLengthinHours * 1 hours;
+        address _tokenContractAddress) {
+        startTime = now + _startTimeInHoursFromNow.mul(1 hours);
+        endTime = startTime + _saleLengthinHours.mul(1 hours);
         beneficiaryAddress = _beneficiaryAddress;
         tokensPerEther = _tokensPerEther;
+        minimumContribution = _minimumContributionInFinney.mul(1 finney);
         tokenContract = Token(_tokenContractAddress);
     }
 
     function () public payable {
         require(presaleOpen());
-        contributionBy[msg.sender] += msg.value;
-        tokenContract.mintTokens(msg.sender, msg.value * tokensPerEther);
-        ContributionReceived(msg.sender, msg.value, contributionBy[msg.sender],this.balance);
+        require(msg.value >= minimumContribution);
+        contributionBy[msg.sender] = contributionBy[msg.sender].add(msg.value);
+        tokenContract.mintTokens(msg.sender, msg.value.mul(tokensPerEther));
+        ContributionReceived(msg.sender, msg.value, contributionBy[msg.sender], this.balance);
     }
 
 
