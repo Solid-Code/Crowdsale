@@ -17,7 +17,8 @@ library SafeMath {
 }
 
 interface Token {
-    function mintTokens(address _recipient, uint _value);
+    function mintTokens(address _recipient, uint _value) returns(bool success);
+    function burnAllTokens(address _address) returns(bool success);
     function balanceOf(address _holder) returns(uint256 tokens);
     function totalSupply() returns(uint256 totalSupply);
     function crowdsaleSucceeded();
@@ -99,7 +100,7 @@ contract Crowdsale {
         bonusPercents {30,20,10,0}
     */
     function tokensPerEth() view public returns(uint256 _tokensPerEth) {
-        uint256 timeSinceStart = now.min(startTime);
+        uint256 timeSinceStart = now - startTime;
         uint256 totalBonusTime = 0;
         for(uint16 i = 0; totalBonusTime >= timeSinceStart; i++){
             totalBonusTime += bonusHours[i].mul(1 hours);
@@ -114,6 +115,7 @@ contract Crowdsale {
         contributionBy[msg.sender] = 0;
         require(amount > 0);
         msg.sender.transfer(amount);
+        tokenContract.burnAllTokens(msg.sender);
         PaidRefund(msg.sender,amount);
     }
     
