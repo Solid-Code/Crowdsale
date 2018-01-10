@@ -38,7 +38,7 @@ contract presale {
     event ContributionReceived(address contributer, uint256 amount, uint256 totalContributions,uint totalAmountRaised);
     event FundsWithdrawn(uint256 funds, address beneficiaryAddress);
 
-    function Presale(
+    function presale(
         address _beneficiaryAddress,
         uint256 _tokensPerEther,
         uint256 _minimumContributionInFinney,
