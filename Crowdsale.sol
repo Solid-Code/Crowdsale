@@ -17,11 +17,11 @@ library SafeMath {
 }
 
 interface Token {
-    function mintTokens(address _recipient, uint _value) returns(bool success);
-    function burnAllTokens(address _address) returns(bool success);
-    function balanceOf(address _holder) returns(uint256 tokens);
-    function totalSupply() returns(uint256 totalSupply);
-    function crowdsaleSucceeded();
+    function mintTokens(address _recipient, uint _value) public returns(bool success);
+    function burnAllTokens(address _address) public returns(bool success);
+    function balanceOf(address _holder) public returns(uint256 tokens);
+    function totalSupply() public returns(uint256 _totalSupply);
+    function crowdsaleSucceeded() public;
 }
 
 contract Crowdsale {
@@ -30,13 +30,13 @@ contract Crowdsale {
     Token public tokenContract;
     
     address public beneficiaryAddress;
+    uint256 public baseTokensPerEth;
     uint256 public minimumContribution;
-    uint256 public softCap;
-    uint256 public hardCap;
     uint256 public startTime;
     uint256 public endTime;
+    uint256 public softCap;
+    uint256 public hardCap;
     int8 public heldPercent;
-    uint256 public baseTokensPerEth;
     uint256[] public bonusPercents;
     uint256[] public bonusHours;
     uint256 public fundsRaised;
@@ -48,27 +48,27 @@ contract Crowdsale {
 
     function Crowdsale(
         address _beneficiaryAddress,
-        int8 _heldPercent,
-        uint256 _minimumContributionInFinney,
-        uint256 _softCapInEther,
-        uint256 _hardCapInTokens,
         uint256 _baseTokensPerEth,
+        uint256 _minimumContributionInFinney,
         uint256 _startTimeInHoursFromNow,
         uint256 _saleLengthinHours,
+        address _tokenContractAddress,
+        uint256 _softCapInEther,
+        uint256 _hardCapInTokens,
         uint256[] _bonusPercents,
         uint256[] _bonusTimes,
-        address _tokenContractAddress ) {
+        int8 _heldPercent ) {
         beneficiaryAddress = _beneficiaryAddress;
-        heldPercent = _heldPercent;
-        minimumContribution = _minimumContributionInFinney.mul(1 finney);
-        softCap = _softCapInEther.mul(1 ether);
-        hardCap = _hardCapInTokens.mul(1e18);
         baseTokensPerEth = _baseTokensPerEth;
-        startTime = now.add(_startTimeInHoursFromNow.mul(1 hours));
-        endTime = startTime.add(_saleLengthinHours.mul(1 hours));
+        minimumContribution = _minimumContributionInFinney * 1 finney;
+        startTime = now + (_startTimeInHoursFromNow * 1 hours);
+        endTime = startTime + (_saleLengthinHours * 1 hours);
+        tokenContract = Token(_tokenContractAddress);
+        softCap = _softCapInEther * 1 ether;
+        hardCap = _hardCapInTokens.mul(1e18);
         bonusPercents = _bonusPercents;
         bonusHours = _bonusTimes;
-        tokenContract = Token(_tokenContractAddress);
+        heldPercent = _heldPercent;
     }
 
     function () public payable {
@@ -87,29 +87,32 @@ contract Crowdsale {
         tokenContract.mintTokens(msg.sender, tokensMinted);
         ContributionReceived(msg.sender, msg.value, contributionBy[msg.sender],fundsRaised, tokensMinted, softCapExceeded());
     }
-
+    /*
+    Conditions Functions
+    */
     function softCapExceeded() internal view returns(bool) {return (fundsRaised >= softCap);}
     function hardCapMet() internal view returns(bool) {return (fundsRaised >= hardCap);}
     function crowdsaleStarted() internal view returns(bool) {return(now >= startTime);}
     function crowdsaleOver() internal view returns(bool) {return (hardCapMet() || now >= endTime);}
-    function crowdsaleFailed() internal view returns(bool) {return(!softCapExceeded() && now >= endTime);}
+    function softCapNotMet() internal view returns(bool) {return(!softCapExceeded() && now >= endTime);}
     
 
     /*Provide:
         bonusHours {24,24,24,24}
         bonusPercents {30,20,10,0}
     */
+    
     function tokensPerEth() view public returns(uint256 _tokensPerEth) {
         uint256 timeSinceStart = now - startTime;
         uint256 totalBonusTime = 0;
         for(uint16 i = 0; totalBonusTime >= timeSinceStart; i++){
-            totalBonusTime += bonusHours[i].mul(1 hours);
+            totalBonusTime += bonusHours[i] * 1 hours;
         }
         _tokensPerEth = baseTokensPerEth.add(baseTokensPerEth.mul(bonusPercents[i]));
     }
     
     function withdrawRefund() public {
-        require(crowdsaleFailed());
+        require(softCapNotMet());
         uint256 amount = contributionBy[msg.sender];
         require(contributionBy[msg.sender] > 0);
         contributionBy[msg.sender] = 0;
@@ -121,7 +124,7 @@ contract Crowdsale {
     
     function finalizeCrowdsale() public {
         require(softCapExceeded());
-        require(crowdsaleOver());
+        require(softCapNotMet());
         require(this.balance > 0); 
         uint256 totalTokensMinted = tokenContract.totalSupply();
         tokenContract.crowdsaleSucceeded();
@@ -132,7 +135,3 @@ contract Crowdsale {
         FinalalizeCrowdsale(fundsRaised, beneficiaryAddress, totalTokensMinted, foundersTokens);
     }
 }
-
-
-
-
