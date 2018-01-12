@@ -17,12 +17,12 @@ library SafeMath {
 }
 
 interface Token {
-    function mintTokens(address _recipient, uint _value);
-    function balanceOf(address _holder) returns(uint256 tokens);
-    function totalSupply() returns(uint256 totalSupply);
+    function mintTokens(address _recipient, uint _value) public;
+    function balanceOf(address _holder) public returns(uint256 tokens);
+    function totalSupply() public returns(uint256 _totalSupply);
 }
 
-contract presale {
+contract Presale {
     using SafeMath for uint256;
     
     Token public tokenContract;
@@ -38,18 +38,18 @@ contract presale {
     event ContributionReceived(address contributer, uint256 amount, uint256 totalContributions,uint totalAmountRaised);
     event FundsWithdrawn(uint256 funds, address beneficiaryAddress);
 
-    function presale(
+    function Presale(
         address _beneficiaryAddress,
         uint256 _tokensPerEther,
         uint256 _minimumContributionInFinney,
         uint256 _startTimeInHoursFromNow,
         uint256 _saleLengthinHours,
         address _tokenContractAddress) {
-        startTime = now + _startTimeInHoursFromNow.mul(1 hours);
-        endTime = startTime + _saleLengthinHours.mul(1 hours);
+        startTime = now + (_startTimeInHoursFromNow * 1 hours);
+        endTime = startTime + (_saleLengthinHours * 1 hours);
         beneficiaryAddress = _beneficiaryAddress;
         tokensPerEther = _tokensPerEther;
-        minimumContribution = _minimumContributionInFinney.mul(1 finney);
+        minimumContribution = _minimumContributionInFinney * 1 finney;
         tokenContract = Token(_tokenContractAddress);
     }
 
@@ -70,7 +70,3 @@ contract presale {
         FundsWithdrawn(this.balance, beneficiaryAddress);
     }
 }
-
-
-
-
