@@ -95,7 +95,8 @@ contract Crowdsale {
     function crowdsaleStarted() internal view returns(bool) {return(now >= startTime);}
     function crowdsaleOver() internal view returns(bool) {return (hardCapMet() || now >= endTime);}
     function softCapNotMet() internal view returns(bool) {return(!softCapExceeded() && now >= endTime);}
-    
+    function crowdsaleOpen() public view returns(bool) {return(crowdsaleStarted() && !crowdsaleOver());}
+
 
     /*Provide:
         bonusHours {24,24,24,24}
