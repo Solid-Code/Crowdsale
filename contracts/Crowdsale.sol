@@ -1,28 +1,7 @@
 pragma solidity ^0.4.18;
 
-library SafeMath {
-
-    function sub(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a - b) <= a);
-    }
-    function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a + b) >= a);
-    }
-    function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((b == 0 || (c = a * b) / b == a));
-    }
-    function div(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        c = a / b;
-    }
-}
-
-interface Token {
-    function mintTokens(address _recipient, uint _value) external returns(bool success);
-    function burnAllTokens(address _address) public returns(bool success);
-    function balanceOf(address _holder) public returns(uint256 tokens);
-    function totalSupply() public returns(uint256 _totalSupply);
-    function crowdsaleSucceeded() public;
-}
+import './SafeMath.sol';
+import './Token.sol';
 
 contract Crowdsale {
     using SafeMath for uint256;

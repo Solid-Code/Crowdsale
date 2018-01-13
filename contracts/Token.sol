@@ -1,18 +1,9 @@
 pragma solidity ^0.4.18;
 
-library SafeMathMod {// Partial SafeMath Library
-
-    function sub(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a - b) < a);
-    }
-
-    function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a + b) > a);
-    }
-}
+import './SafeMath.sol';
 
 contract Token {//is inherently ERC20
-    using SafeMathMod for uint256;
+    using SafeMath for uint256;
 
     /**
     * @constant name The name of the token
