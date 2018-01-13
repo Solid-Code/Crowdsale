@@ -9,7 +9,7 @@ library SafeMath {
         require((c = a + b) >= a);
     }
     function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c == 0 || (c = a * b) / b == a));
+        require((b == 0 || (c = a * b) / b == a));
     }
     function div(uint256 a, uint256 b) internal pure returns (uint256 c) {
         c = a / b;
@@ -17,7 +17,7 @@ library SafeMath {
 }
 
 interface Token {
-    function mintTokens(address _recipient, uint _value) public returns(bool success);
+    function mintTokens(address _recipient, uint _value) external returns(bool success);
     function burnAllTokens(address _address) public returns(bool success);
     function balanceOf(address _holder) public returns(uint256 tokens);
     function totalSupply() public returns(uint256 _totalSupply);
@@ -104,11 +104,11 @@ contract Crowdsale {
     
     function tokensPerEth() view public returns(uint256 _tokensPerEth) {
         uint256 timeSinceStart = now - startTime;
-        uint256 totalBonusTime = 0;
+        uint256 totalBonusTime = bonusHours[0];
         for(uint16 i = 0; totalBonusTime >= timeSinceStart; i++){
             totalBonusTime += bonusHours[i] * 1 hours;
         }
-        _tokensPerEth = baseTokensPerEth.add(baseTokensPerEth.mul(bonusPercents[i]));
+        _tokensPerEth = baseTokensPerEth.add(baseTokensPerEth.mul(bonusPercents[i]).div(100));
     }
     
     function withdrawRefund() public {
