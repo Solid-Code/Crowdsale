@@ -9,7 +9,7 @@ library SafeMath {
         require((c = a + b) >= a);
     }
     function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c == 0 || (c = a * b) / b == a));
+        require((b == 0 || (c = a * b) / b == a));
     }
     function div(uint256 a, uint256 b) internal pure returns (uint256 c) {
         c = a / b;
@@ -17,7 +17,7 @@ library SafeMath {
 }
 
 interface Token {
-    function mintTokens(address _recipient, uint _value) public;
+    function mintTokens(address _recipient, uint _value) external returns(bool success);
     function balanceOf(address _holder) public returns(uint256 tokens);
     function totalSupply() public returns(uint256 _totalSupply);
 }
@@ -62,7 +62,7 @@ contract Presale {
     }
 
 
-    function presaleOpen() internal view returns(bool) {return(now >= startTime && now <= endTime);} 
+    function presaleOpen() public view returns(bool) {return(now >= startTime && now <= endTime);} 
 
     function withdrawFunds() public {
         require(this.balance > 0);
