@@ -9,7 +9,11 @@ import ast
 from ethereum.utils import mk_contract_address, sha3, normalize_address, encode_hex
 
 
-C = {'ROPSTEN': os.environ['ROPSTEN'], 'MAIN': os.environ['MAINNET'] ,'TEST': 'HTTP://127.0.0.1:8545'}
+C = {'INFURA_MAIN': os.environ['MAINNET'],
+        'TEST': 'http://127.0.0.1:8545', 
+        'L_MAIN': 'http://192.168.1.18:9545',
+        'REMOTE_MAIN': 'http://138.68.10.233:54671',
+        'L_ROPSTEN':'http://192.168.1.19:9545'}
 
 def addr_port(var):
     s = var.split(':')
@@ -47,8 +51,12 @@ def read_byte_code(contract_path):
 
 def read_abi(contract_path):
 
+    s = ''
     with open(contract_path) as c:
-        return(json.loads(c.readlines()))
+        for line in c:
+            s = s + line
+   
+    return(json.loads(s))
 
 def determine_addresses(deployer, contrac_quanty):
 
@@ -73,18 +81,28 @@ def determine_addresses(deployer, contrac_quanty):
 if __name__=='__main__':
 
 
+    # THis just checks the status of the other networks
+    for k in C:
+        w3 = Web3(HTTPProvider(C[k]))
+        print ('{}: {}'.format(k, C[k]))
+        print (w3.eth.blockNumber)
+
+
     w3 = Web3(HTTPProvider(C['TEST']))
 
     temp = w3.eth.accounts
     # MAKE SURE THAT THE ACCOUNT IS UNLOCKED AT THE NODE
     deployer = temp[-1]
 
-    pk = 'c3581345eb58d233d96f36b7456e4d3c6ae935b9e2c98805ffd6a280d6c1b97d' 
+    pk = '23ec593c45028968639e12ed8857dd4ccadb92888108caeb9bdeb2f200263837' 
     #w3.personal.unlockAccount(deployer, pk)
 
+    c_path = 'build/SafeMath.'
     safeMath = w3.eth.contract()
-
-    safeMath.bytecode = read_byte_code('build/SafeMath.bin')
-    print (safeMath.bytecode)
+    safeMath.bytecode = read_byte_code(c_path + 'bin')
+    safeMath.abi = read_abi(c_path + 'abi')
     safeMath.deploy()
-    
+   
+
+
+
