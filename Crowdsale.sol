@@ -19,8 +19,8 @@ library SafeMath {
 interface Token {
     function mintTokens(address _recipient, uint _value) external returns(bool success);
     function burnAllTokens(address _address) public returns(bool success);
-    function balanceOf(address _holder) public returns(uint256 tokens);
-    function totalSupply() public returns(uint256 _totalSupply);
+    function balanceOf(address _holder) public view returns(uint256 tokens);
+    function totalSupply() public view returns(uint256 _totalSupply);
     function crowdsaleSucceeded() public;
 }
 
@@ -35,8 +35,8 @@ contract Crowdsale {
     uint256 public startTime;
     uint256 public endTime;
     uint256 public softCap;
-    uint256 public hardCap;
-    int8 public heldPercent;
+    uint256 public hardCapInTokens;
+    uint8 public heldPercent;
     uint256[] public bonusPercents;
     uint256[] public bonusHours;
     uint256 public fundsRaised;
@@ -50,64 +50,67 @@ contract Crowdsale {
         address _beneficiaryAddress,
         uint256 _baseTokensPerEth,
         uint256 _minimumContributionInFinney,
-        uint256 _startTimeInHoursFromNow,
+        uint256 _startTime,
         uint256 _saleLengthinHours,
         address _tokenContractAddress,
         uint256 _softCapInEther,
         uint256 _hardCapInTokens,
         uint256[] _bonusPercents,
         uint256[] _bonusTimes,
-        int8 _heldPercent ) {
+        uint8 _heldPercent ) {
         beneficiaryAddress = _beneficiaryAddress;
         baseTokensPerEth = _baseTokensPerEth;
         minimumContribution = _minimumContributionInFinney * 1 finney;
-        startTime = now + (_startTimeInHoursFromNow * 1 hours);
+        startTime = _startTime;
         endTime = startTime + (_saleLengthinHours * 1 hours);
         tokenContract = Token(_tokenContractAddress);
         softCap = _softCapInEther * 1 ether;
-        hardCap = _hardCapInTokens.mul(1e18);
+        hardCapInTokens = _hardCapInTokens.mul(1e18).sub(_hardCapInTokens.mul(1e18).mul(_heldPercent).div(100)); //reduce sellable supply to account for founders share
         bonusPercents = _bonusPercents;
         bonusHours = _bonusTimes;
         heldPercent = _heldPercent;
     }
 
     function () public payable {
-        require(crowdsaleStarted());
-        require(!crowdsaleOver());
+        require(crowdsaleOpen());
         require(msg.value >= minimumContribution);
-        contributionBy[msg.sender] = contributionBy[msg.sender].add(msg.value);
-        fundsRaised = fundsRaised.add(msg.value);
+        uint256 contribution = msg.value;
+        uint256 refund;
         uint256 tokensMinted = msg.value.mul(tokensPerEth());
-        if(tokenContract.totalSupply().add(tokensMinted) > hardCap) {
-                uint256 partialTokensMinted = tokensMinted.sub(tokenContract.totalSupply().add(tokensMinted).sub(hardCap));
-                uint256 refund = partialTokensMinted.div(tokensMinted).mul(msg.value);
+        if(tokenContract.totalSupply().add(tokensMinted) > hardCapInTokens) {
+                uint256 partialTokensMinted = tokensMinted.sub(tokenContract.totalSupply().add(tokensMinted).sub(hardCapInTokens));
+                refund = msg.value.mul(tokensMinted.sub(partialTokensMinted)).div(tokensMinted);
+                contribution = msg.value - refund;
                 tokensMinted = partialTokensMinted;
                 msg.sender.transfer(refund);
         }
+        contributionBy[msg.sender] = contributionBy[msg.sender].add(contribution);
+        fundsRaised = fundsRaised.add(contribution);
         tokenContract.mintTokens(msg.sender, tokensMinted);
-        ContributionReceived(msg.sender, msg.value, contributionBy[msg.sender],fundsRaised, tokensMinted, softCapExceeded());
+        ContributionReceived(msg.sender, contribution, contributionBy[msg.sender],fundsRaised, tokensMinted, softCapExceeded());
     }
     /*
-    Conditions Functions
+    Condition Functions
     */
-    function softCapExceeded() internal view returns(bool) {return (fundsRaised >= softCap);}
-    function hardCapMet() internal view returns(bool) {return (fundsRaised >= hardCap);}
-    function crowdsaleStarted() internal view returns(bool) {return(now >= startTime);}
+    function softCapExceeded() public view returns(bool) {return (fundsRaised >= softCap);}
+    function hardCapMet() public view returns(bool) {return (tokenContract.totalSupply() >= hardCapInTokens);}
     function crowdsaleOver() internal view returns(bool) {return (hardCapMet() || now >= endTime);}
     function softCapNotMet() internal view returns(bool) {return(!softCapExceeded() && now >= endTime);}
-    function crowdsaleOpen() public view returns(bool) {return(crowdsaleStarted() && !crowdsaleOver());}
+    function crowdsaleOpen() public view returns(bool) {return((now >= startTime) && !crowdsaleOver());}
 
 
     /*Provide:
-        bonusHours {24,24,24,24}
+        bonusHours {24*7,24*7,24*7,24*7*5}
         bonusPercents {30,20,10,0}
     */
     
     function tokensPerEth() view public returns(uint256 _tokensPerEth) {
         uint256 timeSinceStart = now - startTime;
-        uint256 totalBonusTime = bonusHours[0];
-        for(uint16 i = 0; totalBonusTime >= timeSinceStart; i++){
+        uint256 totalBonusTime = bonusHours[0] * 1 hours;
+        uint16 i = 0;
+        while(totalBonusTime <= timeSinceStart && i < bonusHours.length-1){
             totalBonusTime += bonusHours[i] * 1 hours;
+            i++;
         }
         _tokensPerEth = baseTokensPerEth.add(baseTokensPerEth.mul(bonusPercents[i]).div(100));
     }
@@ -125,12 +128,12 @@ contract Crowdsale {
     
     function finalizeCrowdsale() public {
         require(softCapExceeded());
-        require(softCapNotMet());
+        require(crowdsaleOver());
         require(this.balance > 0); 
         uint256 totalTokensMinted = tokenContract.totalSupply();
         tokenContract.crowdsaleSucceeded();
         beneficiaryAddress.transfer(this.balance);
-        uint256 foundersTokens = uint256((-1 * heldPercent * int256(totalTokensMinted)) / (heldPercent - 100));
+        uint256 foundersTokens = uint256((-1 * int8(heldPercent) * int256(totalTokensMinted)) / (int8(heldPercent) - 100));
         tokenContract.mintTokens(beneficiaryAddress, foundersTokens);
         totalTokensMinted = tokenContract.totalSupply();
         FinalalizeCrowdsale(fundsRaised, beneficiaryAddress, totalTokensMinted, foundersTokens);
