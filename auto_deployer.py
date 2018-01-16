@@ -58,12 +58,12 @@ def build_command(inputs):
 
     return c_list
 
-def linker (library_addr):
+def linker (library_addr, library_name):
 
 
     #solc --optimize --bin MetaCoin.sol | solc --link --libraries TestLib:<address>
     #
-    solc("--libraries", "SafeMath:", library_addr)
+    solc("--libraries", library_name, library_addr)
     pass
 
 
@@ -81,64 +81,113 @@ def read_abi(contract_path):
    
     return(json.loads(s))
 
-def determine_addresses(deployer, contrac_quanty):
+def determine_addresses(deployer, tx_count, qty):
 
-    for i in range(contrac_quanty):
+    addresses = []
+    for i in range(tx_count, tx_count + qty):
 
         _addr = str(encode_hex(mk_contract_address(deployer, i)))
         
-        # Removes the extra b from the front
-        _addr = "0x" + addr[1:]
-
         addresses.append(_addr)
 
-    return safe, crow, pre, token
+    return addresses
 
 # Generates all the contracts classes needed
 def read_all_contracts(source_path):
 
+    path = os.path.abspath(source_path)
+    
     file_list = os.listdir(source_path)
+    only_names_list = []
 
-    contract_list = []
-    C = w3.eth.contract()
+
     for f in file_list:
+        only_names_list.append(f.split('.')[0])
 
-        path = os.path.abspath(f)
-        if 'abi' in f:
-            C.abi = read_abi(path)
+    names_list = list(set(only_names_list))
+    contract_list = {}
 
-        if 'bin' in f:
-            C.byte_code(read_byte_code(path)
+    for n in names_list:
+        n = path + '/' + n
+        abi = read_abi(n + '.abi')
+        byte = read_byte_code(n + '.bin')
+        name = n.split('/')[-1]
+
+        c = w3.eth.contract(abi=abi, bytecode=byte, contract_name=name)
+        
+        contract_list[name] = {'class': c}
+
+    return contract_list
+
+def read_deploy_args(contracts):
+
+    ####### This needs to go in a toml file. And a generator function
+    contracts['Presale']['args']=[
+                    "0x73f6875f53db77141b4df3bfbb4d76a162a195f0",
+                    200,
+                    1000,
+                    0,
+                    1,
+                    contracts['Token']['addr'],
+                    ]
+
+    contracts['Crowdsale']['args' ]= ["0x73f6875f53db77141b4df3bfbb4d76a162a195f0",
+                        10,
+                        1000,
+                        0,
+                        3,
+                        contracts['Token']['addr'],
+                        100,
+                        10000,
+                        [20,10,0],
+                        [1,1,1],
+                        10
+                        ]
 
 
-        contract = w3.eth.contract()
+
+    contracts['Token']['args'] = [
+                        contracts['Presale']['addr'], 
+                        contracts['Presale']['addr']
+                        ]
 
 
+    contracts['SafeMath']['args'] = ''
+    return contracts
+
+    
 
 if __name__=='__main__':
 
 
-    # THis just checks the status of the other networks
-    #for k in C:
-    #    w3 = Web3(HTTPProvider(C[k]))
-    #    print ('{}: {}'.format(k, C[k]))
-    #    print (w3.eth.blockNumber)
-
-
     w3 = Web3(HTTPProvider(C['TEST']))
     deployer = w3.eth.accounts[-1]
-
-    #print ('{}: {}'.format(deployer, w3.eth.getBalance(deployer)))
+    print (deployer)
+    print ()
     
-    # Sometimes needed (It is better to use a prompt) but you have to be careful
-    # About encrypting the traffic because the Private K is in plain text
-    #w3.personal.unlockAccount(deployer, '')
+    tx_count = w3.eth.getTransactionCount(deployer)
+    contracts = read_all_contracts('build')
+    contrs_addrs = determine_addresses(deployer, tx_count, len(contracts))
 
-    c_path = 'build/SafeMath.'
-    safeMath = w3.eth.contract()
-    safeMath.bytecode = read_byte_code(c_path + 'bin')
-    safeMath.abi = read_abi(c_path + 'abi')
+    # Assign address to tokens
+    for i, c_key in enumerate(contracts):
+        contracts[c_key]['addr'] = contrs_addrs[i]
 
-    txan = w3.eth.sendTransaction({'from': w3.eth.coinbase , 'data': '0x' + safeMath.bytecode})
+   
+    contracts = read_deploy_args(contracts)
 
-    safeMath.deploy({'from': w3.eth.coinbase})
+    """
+    for c_key in contracts:
+        print (contracts[c_key])
+        print()
+    """
+
+
+    for c_key in contracts:
+
+        contracts[c_key]['class'].deploy(
+                {'from': deployer}, args = contracts[c_key]['args']
+                )
+
+
+
